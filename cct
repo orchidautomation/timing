@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# Claude Code Template (CCT) - Unified Setup Command
+# Usage: 
+#   cct [project-name]  # Create new project
+#   cct                 # Setup current directory
+#   cct add            # Add to existing project
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check for 'add' command
+if [ "$1" = "add" ]; then
+    # Run cct-add for existing projects
+    SCRIPT_DIR="$(dirname "$0")"
+    if [ -f "$SCRIPT_DIR/cct-add" ]; then
+        exec "$SCRIPT_DIR/cct-add"
+    elif [ -f "/Users/brandonguerrero/Documents/claude-code-template/cct-add" ]; then
+        exec "/Users/brandonguerrero/Documents/claude-code-template/cct-add"
+    else
+        echo -e "${RED}Error: cct-add script not found${NC}"
+        exit 1
+    fi
+fi
+
+echo -e "${BLUE}🚀 Claude Code Template (CCT) Setup${NC}"
+echo "===================================="
+
+# Check if project name provided
+if [ -z "$1" ]; then
+    # No project name, assume we're in the project directory
+    if [ -d ".git" ]; then
+        echo -e "${GREEN}✓${NC} Using current directory: $(basename "$PWD")"
+        # Check if setup script exists
+        if [ -f "./setup-cloud-workflow.sh" ]; then
+            ./setup-cloud-workflow.sh
+        else
+            # Run cct-add instead
+            echo -e "${YELLOW}Setup script not found, running cct-add...${NC}"
+            exec "$(dirname "$0")/cct-add"
+        fi
+    else
+        echo -e "${RED}Error: No project name provided and not in a git repository${NC}"
+        echo ""
+        echo "Usage:"
+        echo "  cct <project-name>  # Create new project"
+        echo "  cct                 # Setup current directory"
+        echo "  cct add            # Add to existing project"
+        exit 1
+    fi
+else
+    # Project name provided, create new project
+    PROJECT_NAME="$1"
+    
+    echo -e "${BLUE}📦 Creating new project: $PROJECT_NAME${NC}"
+    
+    # Check if directory already exists
+    if [ -d "$PROJECT_NAME" ]; then
+        echo -e "${YELLOW}⚠️  Directory $PROJECT_NAME already exists locally${NC}"
+        echo "Using existing directory..."
+        cd "$PROJECT_NAME"
+        
+        # Check if it's already a git repo
+        if [ ! -d .git ]; then
+            git init
+            echo "✅ Initialized git repository"
+        fi
+        
+        # Check if GitHub repo exists
+        if ! gh repo view --json name 2>/dev/null; then
+            gh repo create "$PROJECT_NAME" --private --source=. --push
+            echo "✅ Created GitHub repository"
+        else
+            echo "✅ GitHub repository already exists"
+        fi
+    else
+        # First check if repo exists on GitHub without cloning
+        if gh repo view "orchidautomation/$PROJECT_NAME" &>/dev/null; then
+            echo -e "${YELLOW}⚠️  Repository already exists on GitHub. Cloning...${NC}"
+            git clone "https://github.com/orchidautomation/$PROJECT_NAME.git"
+            cd "$PROJECT_NAME"
+        else
+            # Try to create from template
+            if gh repo create "$PROJECT_NAME" --template="${CLAUDE_TEMPLATE_REPO:-orchidautomation/claude-code-template}" --private --clone 2>/dev/null; then
+                echo "✅ Created from template"
+                cd "$PROJECT_NAME"
+            else
+                # Fallback: clone template manually
+                echo "📦 Creating from template manually..."
+                git clone https://github.com/orchidautomation/claude-code-template.git "$PROJECT_NAME"
+                cd "$PROJECT_NAME"
+                rm -rf .git
+                git init
+                git add -A
+                git commit -m "Initial commit from Claude Code Template"
+                gh repo create "$PROJECT_NAME" --private --source=. --push
+                echo "✅ Created new repository"
+            fi
+        fi
+    fi
+    
+    # Run setup (skip prompts)
+    echo -e "${BLUE}🔧 Running cloud workflow setup...${NC}"
+    if [ -f "./setup-cloud-workflow.sh" ]; then
+        # Auto-answer prompts
+        echo -e "\n\n\n" | ./setup-cloud-workflow.sh || true
+    else
+        echo -e "${YELLOW}Setup script not found, copying from template...${NC}"
+        cp /Users/brandonguerrero/Documents/claude-code-template/setup-cloud-workflow.sh . 2>/dev/null || true
+        chmod +x setup-cloud-workflow.sh 2>/dev/null || true
+        echo -e "\n\n\n" | ./setup-cloud-workflow.sh || true
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✅ Project created and configured!${NC}"
+    echo -e "${YELLOW}📁 Location: $(pwd)${NC}"
+fi

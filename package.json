@@ -1,0 +1,19 @@
+{
+  "name": "claude-code-template",
+  "version": "1.0.0",
+  "description": "Template for Claude Code GitHub automation",
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/orchidautomation/claude-code-template.git"
+  },
+  "keywords": [
+    "claude",
+    "automation",
+    "github-actions"
+  ],
+  "author": "",
+  "license": "MIT"
+}
